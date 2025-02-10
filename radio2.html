@@ -60,7 +60,7 @@
             color: #2c3e50;
         }
 
-        .play-btn {
+        .play-btn, .stop-btn {
             background: #27ae60;
             color: white;
             border: none;
@@ -70,8 +70,16 @@
             transition: background 0.3s;
         }
 
-        .play-btn:hover {
+        .play-btn:hover, .stop-btn:hover {
             background: #219a52;
+        }
+
+        .stop-btn {
+            background: #e74c3c;
+        }
+
+        .stop-btn:hover {
+            background: #c0392b;
         }
 
         #fileInput {
@@ -149,37 +157,44 @@
             return div;
         }
 
-        function playRadio(url) {
+        function handlePlayPause(event) {
+            const target = event.target;
+            if (target.classList.contains('play-btn')) {
+                playRadio(target.dataset.url, target);
+            } else if (target.classList.contains('stop-btn')) {
+                stopRadio(target);
+            }
+        }
+
+        function playRadio(url, button) {
+            if (currentRadio) {
+                stopRadio(document.querySelector('.stop-btn'));
+            }
+
             const stopBtn = document.createElement('button');
             stopBtn.className = 'stop-btn';
             stopBtn.textContent = '⏹ Stop';
-            stopBtn.onclick = stopRadio;
-
-            const radioCard = document.querySelector(`.play-btn[data-url="${url}"]`).parentElement.parentElement;
-            radioCard.querySelector('.play-btn').replaceWith(stopBtn);
-            
-            if (currentRadio) {
-                stopRadio();
-            }
+            stopBtn.dataset.url = url;
+            button.replaceWith(stopBtn);
 
             currentRadio = url;
             audio.src = url;
             audio.play();
         }
 
-        function stopRadio() {
+        function stopRadio(button) {
             audio.pause();
-            document.querySelectorAll('.stop-btn').forEach(btn => {
-                const playBtn = document.createElement('button');
-                playBtn.className = 'play-btn';
-                playBtn.textContent = '▶ Play';
-                playBtn.onclick = playRadio.bind(null, btn.dataset.url);
-                btn.replaceWith(playBtn);
-            });
+            const playBtn = document.createElement('button');
+            playBtn.className = 'play-btn';
+            playBtn.textContent = '▶ Play';
+            playBtn.dataset.url = button.dataset.url;
+            button.replaceWith(playBtn);
             currentRadio = null;
         }
 
-        audio.addEventListener('ended', stopRadio);
+        audio.addEventListener('ended', function() {
+            stopRadio(document.querySelector('.stop-btn'));
+        });
 
         document.getElementById('fileInput').addEventListener('change', function(e) {
             const file = e.target.files[0];
@@ -188,11 +203,7 @@
             }
         });
 
-        radioList.addEventListener('click', function(e) {
-            if (e.target.classList.contains('play-btn')) {
-                playRadio(e.target.dataset.url);
-            }
-        });
+        radioList.addEventListener('click', handlePlayPause);
     </script>
 </body>
 </html>
