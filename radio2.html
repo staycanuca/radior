@@ -36,12 +36,6 @@
             padding: 15px;
         }
 
-        @media (max-width: 768px) {
-            .radio-list {
-                grid-template-columns: 1fr;
-            }
-        }
-
         .radio-card {
             background: white;
             border-radius: 10px;
@@ -89,6 +83,12 @@
             border: 1px solid #ddd;
             cursor: pointer;
         }
+
+        @media (max-width: 768px) {
+            .radio-list {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
@@ -99,8 +99,9 @@
     </div>
 
     <script>
-        let audio = new Audio();
+        const audio = new Audio();
         let currentRadio = null;
+        const radioList = document.getElementById('radioList');
 
         function parseM3U(file) {
             const reader = new FileReader();
@@ -116,9 +117,8 @@
                         const stationName = extinfParts[1] ? extinfParts[1].replace(/"/g, '') : '';
                         const url = lines[i + 1].trim();
                         radioStations.push({ name: stationName, url: url });
-                        i++; // Skip the next line as it's the URL
+                        i++;
                     } else if (line.startsWith('http')) {
-                        // For M3U files without EXTINF tags
                         radioStations.push({ 
                             name: line.split('/').pop(), 
                             url: line 
@@ -126,7 +126,6 @@
                     }
                 }
 
-                const radioList = document.getElementById('radioList');
                 radioList.innerHTML = '';
                 
                 radioStations.forEach((station, index) => {
@@ -141,33 +140,28 @@
             const div = document.createElement('div');
             div.className = 'radio-card';
             
-            const html = `
+            div.innerHTML = `
                 <div class="radio-info">
                     <span class="radio-title">${index}. ${station.name || station.url.split('/').pop()}</span>
-                    <button class="play-btn" onclick="playRadio('${station.url}')">▶ Play</button>
+                    <button class="play-btn" data-url="${station.url}">▶ Play</button>
                 </div>
             `;
-            
-            div.innerHTML = html;
             return div;
         }
 
         function playRadio(url) {
-            const playBtns = document.querySelectorAll('.play-btn');
-            playBtns.forEach(btn => btn.textContent = '▶ Play');
-            
             const stopBtn = document.createElement('button');
             stopBtn.className = 'stop-btn';
             stopBtn.textContent = '⏹ Stop';
-            stopBtn.onclick = () => stopRadio();
-            
-            const radioCard = document.querySelector(`[onclick*="${url}"]`).parentElement.parentElement;
+            stopBtn.onclick = stopRadio;
+
+            const radioCard = document.querySelector(`.play-btn[data-url="${url}"]`).parentElement.parentElement;
             radioCard.querySelector('.play-btn').replaceWith(stopBtn);
             
             if (currentRadio) {
                 stopRadio();
             }
-            
+
             currentRadio = url;
             audio.src = url;
             audio.play();
@@ -175,25 +169,28 @@
 
         function stopRadio() {
             audio.pause();
-            const stopBtns = document.querySelectorAll('.stop-btn');
-            stopBtns.forEach(btn => {
+            document.querySelectorAll('.stop-btn').forEach(btn => {
                 const playBtn = document.createElement('button');
                 playBtn.className = 'play-btn';
                 playBtn.textContent = '▶ Play';
-                playBtn.onclick = () => playRadio(btn.dataset.url);
+                playBtn.onclick = playRadio.bind(null, btn.dataset.url);
                 btn.replaceWith(playBtn);
             });
             currentRadio = null;
         }
 
-        audio.addEventListener('ended', () => {
-            stopRadio();
-        });
+        audio.addEventListener('ended', stopRadio);
 
         document.getElementById('fileInput').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
                 parseM3U(file);
+            }
+        });
+
+        radioList.addEventListener('click', function(e) {
+            if (e.target.classList.contains('play-btn')) {
+                playRadio(e.target.dataset.url);
             }
         });
     </script>
