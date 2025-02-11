@@ -99,6 +99,7 @@
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/howler"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </head>
 <body>
     <div class="container">
@@ -118,6 +119,7 @@
         const volumeControl = document.getElementById('volumeControl');
         
         let player = null; // Instanța Howler.js
+        let hlsPlayer = null; // Instanța HLS.js
 
         // Funcție pentru a parsa fișierul M3U
         function parseM3U(file) {
@@ -158,21 +160,21 @@
             });
         }
 
-        // Creează un card pentru fiecare stație de radio
-        function createRadioCard(station, index) {
-            const div = document.createElement('div');
-            
-            div.className = 'radio-card';
-            
-            div.innerHTML = `
-                <div class="radio-info">
-                    <span class="radio-title">${index}. ${station.name}</span>
-                    <button class="play-btn" data-url="${station.url}">▶ Play</button>
-                </div>
-            `;
-            
-            return div;
-        }
+       // Creează un card pentru fiecare stație de radio
+       function createRadioCard(station, index) {
+           const div = document.createElement('div');
+           
+           div.className = 'radio-card';
+           
+           div.innerHTML = `
+               <div class="radio-info">
+                   <span class="radio-title">${index}. ${station.name}</span>
+                   <button class="play-btn" data-url="${station.url}">▶ Play</button>
+               </div>
+           `;
+           
+           return div;
+       }
 
        // Funcție pentru a reda un post de radio
        function playRadio(url, button) {
@@ -187,13 +189,26 @@
 
            currentRadio = url;
 
-           player = new Howl({
-               src:[url],
-               html5:true,
-               volume: parseFloat(volumeControl.value) // Setează volumul inițial
-           });
+           if (url.endsWith('.m3u8')) { // Dacă este flux HLS
+               const videoElement = document.createElement('video');
+               videoElement.controls = true; 
+               videoElement.style.width = "100%";
+               document.body.appendChild(videoElement);
 
-           player.play();
+               hlsPlayer = new Hls();
+               hlsPlayer.loadSource(url);
+               hlsPlayer.attachMedia(videoElement);
+               videoElement.volume = parseFloat(volumeControl.value); // Setează volumul inițial
+               videoElement.play();
+           } else { // Flux audio obișnuit
+               player = new Howl({
+                   src:[url],
+                   html5:true,
+                   volume: parseFloat(volumeControl.value)
+               });
+
+               player.play();
+           }
        }
 
        // Funcție pentru a opri redarea unui post de radio
@@ -211,6 +226,11 @@
                playBtn.dataset.url = button.dataset.url;
 
                button.replaceWith(playBtn);
+           }
+           
+           if (hlsPlayer) { 
+               hlsPlayer.destroy(); 
+               hlsPlayer = null; 
            }
        }
 
