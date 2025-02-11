@@ -122,7 +122,7 @@
         let hlsPlayer = null; // Instanța HLS.js
         let videoElement = null; // Element video pentru HLS.js
 
-       // Funcție pentru a opri orice flux activ
+       // Funcție pentru a opri doar fluxul curent
        function stopCurrentStream() {
            if (player) { 
                player.stop(); 
@@ -175,16 +175,59 @@
            }
        }
 
-       // Funcție pentru a opri redarea unui post de radio
-       function stopRadio(button) {
-           stopCurrentStream(); // Oprește orice flux activ
+       // Funcție pentru a afișa lista de posturi fără a o reseta
+       function renderRadioStations(stations) {
+           radioList.innerHTML = '';
+           
+           stations.forEach((station, index) => {
+               const radioCard = createRadioCard(station, index + 1);
+               radioList.appendChild(radioCard);
+           });
+       }
 
-           const playBtn = document.createElement("button");
-           playBtn.className = 'play-btn';
-           playBtn.textContent = '▶ Play';
-           playBtn.dataset.url = button.dataset.url;
+       // Creează un card pentru fiecare stație de radio
+       function createRadioCard(station, index) {
+           const div = document.createElement('div');
+           
+           div.className = 'radio-card';
+           
+           div.innerHTML = `
+               <div class="radio-info">
+                   <span class="radio-title">${index}. ${station.name}</span>
+                   <button class="play-btn" data-url="${station.url}">▶ Play</button>
+               </div>
+           `;
+           
+           return div;
+       }
 
-           button.replaceWith(playBtn);
+       // Funcție pentru a parsa fișierul M3U fără a afecta lista existentă
+       function parseM3U(file) {
+           const reader = new FileReader();
+           
+           reader.onload = function(e) {
+               const content = e.target.result; // Conținutul fișierului
+               const lines = content.split('\n');
+               const radioStations = [];
+
+               for (let i = 0; i < lines.length; i++) {
+                   const line = lines[i].trim();
+                   if (line.startsWith('#EXTINF')) { 
+                       const stationName = line.split(',')[1] || 'Unknown Station';
+                       const url = lines[i + 1]?.trim();
+                       if (url) {
+                           radioStations.push({ name: stationName, url });
+                       }
+                       i++; // Sari peste linia URL
+                   } else if (line.startsWith('http')) { 
+                       radioStations.push({ name: line.split('/').pop(), url: line });
+                   }
+               }
+
+               renderRadioStations(radioStations);
+           };
+
+           reader.readAsText(file);
        }
 
        // Gestionarea evenimentelor de clic pe butoane
@@ -194,7 +237,14 @@
            if (target.classList.contains('play-btn')) {
                playRadio(target.dataset.url, target);
            } else if (target.classList.contains('stop-btn')) {
-               stopRadio(target);
+               stopCurrentStream();
+               
+               const playBtn = document.createElement("button");
+               playBtn.className = 'play-btn';
+               playBtn.textContent = '▶ Play';
+               playBtn.dataset.url = target.dataset.url;
+
+               target.replaceWith(playBtn);
            }
        }
 
