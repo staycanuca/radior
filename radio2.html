@@ -31,7 +31,7 @@
 
         .radio-list {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 15px;
             padding: 15px;
         }
@@ -98,7 +98,7 @@
             }
         }
     </style>
-    <script src="https://rplayer.js.org/dist/rplayer.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/howler"></script>
 </head>
 <body>
     <div class="container">
@@ -108,95 +108,123 @@
     </div>
 
     <script>
-        let currentRadio = null;
+        let currentRadio = null; // URL-ul curent al postului redat
         const radioList = document.getElementById('radioList');
+        let player = null; // Instanța Howler.js
 
+        // Funcție pentru a parsa fișierul M3U
         function parseM3U(file) {
             const reader = new FileReader();
+            
             reader.onload = function(e) {
-                const content = e.target.result;
+                const content = e.target.result; // Conținutul fișierului
                 const lines = content.split('\n');
                 const radioStations = [];
 
                 for (let i = 0; i < lines.length; i++) {
                     const line = lines[i].trim();
-                    if (line.startsWith('#EXTINF:')) {
-                        const extinfParts = line.split(',');
-                        const stationName = extinfParts[1] ? extinfParts[1].replace(/"/g, '') : '';
-                        const url = lines[i + 1].trim();
-                        radioStations.push({ name: stationName, url: url });
-                        i++;
-                    } else if (line.startsWith('http')) {
-                        radioStations.push({ 
-                            name: line.split('/').pop(), 
-                            url: line 
-                        });
+                    if (line.startsWith('#EXTINF')) { 
+                        const stationName = line.split(',')[1] || 'Unknown Station';
+                        const url = lines[i + 1]?.trim();
+                        if (url) {
+                            radioStations.push({ name: stationName, url });
+                        }
+                        i++; // Sari peste linia URL
+                    } else if (line.startsWith('http')) { 
+                        radioStations.push({ name: line.split('/').pop(), url: line });
                     }
                 }
 
-                radioList.innerHTML = '';
-                
-                radioStations.forEach((station, index) => {
-                    const radioCard = createRadioCard(station, index + 1);
-                    radioList.appendChild(radioCard);
-                });
+                renderRadioStations(radioStations);
             };
+
             reader.readAsText(file);
         }
 
+        // Funcție pentru a afișa posturile de radio în interfață
+        function renderRadioStations(stations) {
+            radioList.innerHTML = '';
+            
+            stations.forEach((station, index) => {
+                const radioCard = createRadioCard(station, index + 1);
+                radioList.appendChild(radioCard);
+            });
+        }
+
+        // Creează un card pentru fiecare stație de radio
         function createRadioCard(station, index) {
             const div = document.createElement('div');
+            
             div.className = 'radio-card';
             
             div.innerHTML = `
                 <div class="radio-info">
-                    <span class="radio-title">${index}. ${station.name || station.url.split('/').pop()}</span>
+                    <span class="radio-title">${index}. ${station.name}</span>
                     <button class="play-btn" data-url="${station.url}">▶ Play</button>
                 </div>
             `;
+            
             return div;
         }
 
-        let player = null;
-
+        // Funcție pentru a reda un post de radio
         function playRadio(url, button) {
-            if (currentRadio) {
-                stopRadio(document.querySelector('.stop-btn'));
-            }
+           if (currentRadio) { stopRadio(document.querySelector('.stop-btn')); }
+           
+           const stopBtn = document.createElement("button");
+           stopBtn.className = 'stop-btn';
+           stopBtn.textContent = '⏹ Stop';
+           stopBtn.dataset.url = url;
 
-            const stopBtn = document.createElement('button');
-            stopBtn.className = 'stop-btn';
-            stopBtn.textContent = '⏹ Stop';
-            stopBtn.dataset.url = url;
-            button.replaceWith(stopBtn);
+           button.replaceWith(stopBtn);
 
-            currentRadio = url;
-            player = new RPlayer({
-                src: url,
-                autoplay: true
-            });
-        }
+           currentRadio = url;
 
-        function stopRadio(button) {
-            if (player) {
-                player.pause();
-            }
-            const playBtn = document.createElement('button');
-            playBtn.className = 'play-btn';
-            playBtn.textContent = '▶ Play';
-            playBtn.dataset.url = button.dataset.url;
-            button.replaceWith(playBtn);
-            currentRadio = null;
-        }
+           player = new Howl({
+               src:[url],
+               html5:true // Asigură redarea HTML5
+           });
 
-        document.getElementById('fileInput').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                parseM3U(file);
-            }
-        });
+           player.play();
+       }
 
-        radioList.addEventListener('click', handlePlayPause);
-    </script>
+       // Funcție pentru a opri redarea unui post de radio
+       function stopRadio(button) {
+           if (player) {
+               player.stop();
+               player.unload(); // Eliberează resursele
+               player = null;
+
+               currentRadio = null;
+
+               const playBtn = document.createElement("button");
+               playBtn.className = 'play-btn';
+               playBtn.textContent = '▶ Play';
+               playBtn.dataset.url = button.dataset.url;
+
+               button.replaceWith(playBtn);
+           }
+       }
+
+       // Gestionarea evenimentelor de clic pe butoane
+       function handlePlayPause(e) {
+           const target = e.target;
+
+           if (target.classList.contains('play-btn')) {
+               playRadio(target.dataset.url, target);
+           } else if (target.classList.contains('stop-btn')) {
+               stopRadio(target);
+           }
+       }
+
+       // Eveniment pentru încărcarea fișierului M3U
+       document.getElementById('fileInput').addEventListener('change', function(e) {
+           const file = e.target.files[0];
+           if (file) parseM3U(file);
+       });
+
+       // Eveniment pentru gestionarea clicurilor în lista de posturi
+       radioList.addEventListener('click', handlePlayPause);
+   </script>
 </body>
 </html>
