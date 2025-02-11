@@ -140,16 +140,35 @@
            currentRadio = null; // Resetează fluxul curent
        }
 
+       // Funcție pentru a actualiza starea butoanelor Play/Stop
+       function updateButtons(activeUrl) {
+           const buttons = document.querySelectorAll('.radio-card .play-btn, .radio-card .stop-btn');
+           buttons.forEach(button => {
+               const url = button.dataset.url;
+
+               if (url === activeUrl) {
+                   // Dacă este fluxul activ, afișează butonul Stop
+                   const stopBtn = document.createElement('button');
+                   stopBtn.className = 'stop-btn';
+                   stopBtn.textContent = '⏹ Stop';
+                   stopBtn.dataset.url = url;
+
+                   button.replaceWith(stopBtn);
+               } else if (button.classList.contains('stop-btn')) {
+                   // Dacă nu este fluxul activ și este Stop, schimbă în Play
+                   const playBtn = document.createElement('button');
+                   playBtn.className = 'play-btn';
+                   playBtn.textContent = '▶ Play';
+                   playBtn.dataset.url = url;
+
+                   button.replaceWith(playBtn);
+               }
+           });
+       }
+
        // Funcție pentru a reda un post de radio
-       function playRadio(url, button) {
+       function playRadio(url) {
            stopCurrentStream(); // Oprește orice flux activ
-
-           const stopBtn = document.createElement("button");
-           stopBtn.className = 'stop-btn';
-           stopBtn.textContent = '⏹ Stop';
-           stopBtn.dataset.url = url;
-
-           button.replaceWith(stopBtn);
 
            currentRadio = url;
 
@@ -173,6 +192,8 @@
 
                player.play();
            }
+
+           updateButtons(url); // Actualizează starea butoanelor
        }
 
        // Funcție pentru a afișa lista de posturi fără a o reseta
@@ -235,16 +256,10 @@
            const target = e.target;
 
            if (target.classList.contains('play-btn')) {
-               playRadio(target.dataset.url, target);
+               playRadio(target.dataset.url);
            } else if (target.classList.contains('stop-btn')) {
                stopCurrentStream();
-               
-               const playBtn = document.createElement("button");
-               playBtn.className = 'play-btn';
-               playBtn.textContent = '▶ Play';
-               playBtn.dataset.url = target.dataset.url;
-
-               target.replaceWith(playBtn);
+               updateButtons(null); // Resetează starea butoanelor la Play
            }
        }
 
