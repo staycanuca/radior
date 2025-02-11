@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Radio Streaming</title>
+    <title>Radio Streaming cu Control de Volum</title>
     <style>
+        /* Stiluri generale */
         * {
             margin: 0;
             padding: 0;
@@ -92,24 +93,30 @@
             cursor: pointer;
         }
 
-        @media (max-width: 768px) {
-            .radio-list {
-                grid-template-columns: 1fr;
-            }
+        #volumeControl {
+            width: calc(100% - 40px);
+            margin-top: 20px;
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/howler"></script>
 </head>
 <body>
     <div class="container">
-        <h1>Radio Streaming</h1>
+        <h1>Radio Streaming cu Control de Volum</h1>
         <input type="file" id="fileInput" accept=".m3u">
+        
+        <!-- Slider pentru controlul volumului -->
+        <label for="volumeControl">Volum:</label>
+        <input type="range" id="volumeControl" min="0" max="1" step="0.1" value="0.5">
+
         <div class="radio-list" id="radioList"></div>
     </div>
 
     <script>
         let currentRadio = null; // URL-ul curent al postului redat
         const radioList = document.getElementById('radioList');
+        const volumeControl = document.getElementById('volumeControl');
+        
         let player = null; // Instanța Howler.js
 
         // Funcție pentru a parsa fișierul M3U
@@ -167,8 +174,8 @@
             return div;
         }
 
-        // Funcție pentru a reda un post de radio
-        function playRadio(url, button) {
+       // Funcție pentru a reda un post de radio
+       function playRadio(url, button) {
            if (currentRadio) { stopRadio(document.querySelector('.stop-btn')); }
            
            const stopBtn = document.createElement("button");
@@ -182,7 +189,8 @@
 
            player = new Howl({
                src:[url],
-               html5:true // Asigură redarea HTML5
+               html5:true,
+               volume: parseFloat(volumeControl.value) // Setează volumul inițial
            });
 
            player.play();
@@ -225,6 +233,11 @@
 
        // Eveniment pentru gestionarea clicurilor în lista de posturi
        radioList.addEventListener('click', handlePlayPause);
+
+       // Eveniment pentru slider-ul de volum
+       volumeControl.addEventListener('input', function() {
+           if (player) player.volume(parseFloat(this.value));
+       });
    </script>
 </body>
 </html>
