@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radio Streaming cu Control de Volum</title>
+    <style>
+        /* Stiluri generale */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+
+        .radio-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            padding: 15px;
+        }
+
+        .radio-card {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+        }
+
+        .radio-card:hover {
+            transform: translateX(5px);
+        }
+
+        .radio-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .radio-title {
+            font-size: 1.1em;
+            color: #2c3e50;
+        }
+
+        .play-btn, .stop-btn {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .play-btn:hover, .stop-btn:hover {
+            background: #219a52;
+        }
+
+        .stop-btn {
+            background: #e74c3c;
+        }
+
+        .stop-btn:hover {
+            background: #c0392b;
+        }
+
+        #fileInput {
+            display: block;
+            margin: 20px auto;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            cursor: pointer;
+        }
+
+        #volumeControl {
+            width: calc(100% - 40px);
+            margin-top: 20px;
+        }
+    </style>
+    <script src="https://radioplayer.luna-universe.com/lunaradio.min.js"></script>
+    <link rel="stylesheet" href="https://radioplayer.luna-universe.com/lunaradio.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Radio Streaming cu Control de Volum</h1>
+        <input type="file" id="fileInput" accept=".m3u">
+        
+        <!-- Slider pentru controlul volumului -->
+        <label for="volumeControl">Volum:</label>
+        <input type="range" id="volumeControl" min="0" max="1" step="0.1" value="0.5">
+
+        <div class="radio-list" id="radioList"></div>
+    </div>
+
+    <script>
+        let currentRadio = null; // URL-ul curent al postului redat
+        const radioList = document.getElementById('radioList');
+        const volumeControl = document.getElementById('volumeControl');
+
+        let lunaPlayer = null; // Instanța Luna Radio Player
+
+       // Funcție pentru a opri doar fluxul curent
+       function stopCurrentStream() {
+           if (lunaPlayer) { 
+               lunaPlayer.stop(); 
+               lunaPlayer = null; 
+           }
+           currentRadio = null; // Resetează fluxul curent
+       }
+
+       // Funcție pentru a actualiza starea butoanelor Play/Stop
+       function updateButtons(activeUrl) {
+           const buttons = document.querySelectorAll('.radio-card .play-btn, .radio-card .stop-btn');
+           buttons.forEach(button => {
+               const url = button.dataset.url;
+
+               if (url === activeUrl) {
+                   // Dacă este fluxul activ, afișează butonul Stop
+                   const stopBtn = document.createElement('button');
+                   stopBtn.className = 'stop-btn';
+                   stopBtn.textContent = '⏹ Stop';
+                   stopBtn.dataset.url = url;
+
+                   button.replaceWith(stopBtn);
+               } else if (button.classList.contains('stop-btn')) {
+                   // Dacă nu este fluxul activ și este Stop, schimbă în Play
+                   const playBtn = document.createElement('button');
+                   playBtn.className = 'play-btn';
+                   playBtn.textContent = '▶ Play';
+                   playBtn.dataset.url = url;
+
+                   button.replaceWith(playBtn);
+               }
+           });
+       }
+
+       // Funcție pentru a reda un post de radio
+       function playRadio(url) {
+           stopCurrentStream(); // Oprește orice flux activ
+
+           currentRadio = url;
+
+           lunaPlayer = new LunaRadio({
+               src: url,
+               autoplay: true,
+               volume: parseFloat(volumeControl.value)
+           });
+
+           updateButtons(url); // Actualizează starea butoanelor
+       }
+
+       // Funcție pentru a afișa lista de posturi fără a o reseta
+       function renderRadioStations(stations) {
+           radioList.innerHTML = '';
+           
+           stations.forEach((station, index) => {
+               const radioCard = createRadioCard(station, index + 1);
+               radioList.appendChild(radioCard);
+           });
+       }
+
+       // Creează un card pentru fiecare stație de radio
+       function createRadioCard(station, index) {
+           const div = document.createElement('div');
+           
+           div.className = 'radio-card';
+           
+           div.innerHTML = `
+               <div class="radio-info">
+                   <span class="radio-title">${index}. ${station.name}</span>
+                   <button class="play-btn" data-url="${station.url}">▶ Play</button>
+               </div>
+           `;
+           
+           return div;
+       }
+
+       // Funcție pentru a parsa fișierul M3U fără a afecta lista existentă
+       function parseM3U(file) {
+           const reader = new FileReader();
+           
+           reader.onload = function(e) {
+               const content = e.target.result; // Conținutul fișierului
+               const lines = content.split('\n');
+               const radioStations = [];
+
+               for (let i = 0; i < lines.length; i++) {
+                   const line = lines[i].trim();
+                   if (line.startsWith('#EXTINF')) { 
+                       const stationName = line.split(',')[1] || 'Unknown Station';
+                       const url = lines[i + 1]?.trim();
+                       if (url) {
+                           radioStations.push({ name: stationName, url });
+                       }
+                       i++; // Sari peste linia URL
+                   } else if (line.startsWith('http')) { 
+                       radioStations.push({ name: line.split('/').pop(), url: line });
+                   }
+               }
+
+               renderRadioStations(radioStations);
+           };
+
+           reader.readAsText(file);
+       }
+
+       // Gestionarea evenimentelor de clic pe butoane
+       function handlePlayPause(e) {
+           const target = e.target;
+
+           if (target.classList.contains('play-btn')) {
+               playRadio(target.dataset.url);
+           } else if (target.classList.contains('stop-btn')) {
+               stopCurrentStream();
+               updateButtons(null); // Resetează starea butoanelor la Play
+           }
+       }
+
+       // Eveniment pentru încărcarea fișierului M3U
+       document.getElementById('fileInput').addEventListener('change', function(e) {
+           const file = e.target.files[0];
+           if (file) parseM3U(file);
+       });
+
+       // Eveniment pentru gestionarea clicurilor în lista de posturi
+       radioList.addEventListener('click', handlePlayPause);
+
+       // Eveniment pentru slider-ul de volum
+       volumeControl.addEventListener('input', function() {
+           if (lunaPlayer) lunaPlayer.setVolume(parseFloat(this.value));
+       });
+   </script>
+</body>
+</html>
