@@ -4,8 +4,99 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Radio Streaming</title>
-    <style>
-        /* CSS-ul existent */
+<style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+
+        .radio-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            padding: 15px;
+        }
+
+        .radio-card {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+        }
+
+        .radio-card:hover {
+            transform: translateX(5px);
+        }
+
+        .radio-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .radio-title {
+            font-size: 1.1em;
+            color: #2c3e50;
+        }
+
+        .play-btn, .stop-btn {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .play-btn:hover, .stop-btn:hover {
+            background: #219a52;
+        }
+
+        .stop-btn {
+            background: #e74c3c;
+        }
+
+        .stop-btn:hover {
+            background: #c0392b;
+        }
+
+        #fileInput {
+            display: block;
+            margin: 20px auto;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            cursor: pointer;
+        }
+
+        @media (max-width: 768px) {
+            .radio-list {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
     <script src="https://rplayer.js.org/dist/rplayer.min.js"></script>
 </head>
