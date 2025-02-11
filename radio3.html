@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Radio Streaming cu Control de Volum</title>
+    <title>Radio Professional Shoutcast</title>
     <style>
-        /* Stiluri generale */
         * {
             margin: 0;
             padding: 0;
@@ -28,6 +27,15 @@
             text-align: center;
             color: #2c3e50;
             margin-bottom: 30px;
+        }
+
+        #nowPlaying {
+            text-align: center;
+            margin: 15px 0;
+            padding: 10px;
+            background: rgba(255,255,255,0.9);
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
         .radio-list {
@@ -59,6 +67,9 @@
         .radio-title {
             font-size: 1.1em;
             color: #2c3e50;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .play-btn, .stop-btn {
@@ -69,6 +80,7 @@
             border-radius: 5px;
             cursor: pointer;
             transition: background 0.3s;
+            flex-shrink: 0;
         }
 
         .play-btn:hover, .stop-btn:hover {
@@ -92,137 +104,208 @@
             border: 1px solid #ddd;
             cursor: pointer;
         }
-
-        #volumeControl {
-            width: calc(100% - 40px);
-            margin-top: 20px;
-        }
     </style>
-    <script src="https://radioplayer.luna-universe.com/lunaradio.min.js"></script>
-    <link rel="stylesheet" href="https://radioplayer.luna-universe.com/lunaradio.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.3/howler.min.js"></script>
 </head>
 <body>
     <div class="container">
-        <h1>Radio Streaming cu Control de Volum</h1>
+        <h1>Radio Professional Shoutcast</h1>
         <input type="file" id="fileInput" accept=".m3u">
-        
-        <!-- Slider pentru controlul volumului -->
-        <label for="volumeControl">Volum:</label>
-        <input type="range" id="volumeControl" min="0" max="1" step="0.1" value="0.5">
-
-        <div class="radio-list" id="radioList"></div>
+        <div id="nowPlaying">🎵 Nu este în curs de redare</div>
+        <div class="radio-list" id="radioList">
+            <!-- Post demo predefinit -->
+            <div class="radio-card">
+                <div class="radio-info">
+                    <span class="radio-title">Radio Prob FM</span>
+                    <button class="play-btn" data-url="http://live.radioprob.ro:8888/">▶ Play</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
-        let currentRadio = null;
-        const radioList = document.getElementById('radioList');
-        const volumeControl = document.getElementById('volumeControl');
-
-        let lunaPlayer = null;
+        const CORS_PROXY = "https://cors-anywhere.herokuapp.com/";
+        let currentSound = null;
+        let metadataReader = null;
+        let currentPlayingUrl = null;
 
         function stopCurrentStream() {
-            if (lunaPlayer) {
-                lunaPlayer.stop();
+            if (currentSound) {
+                currentSound.stop();
+                currentSound = null;
             }
-            currentRadio = null;
-            updateButtons(null);
+            if (metadataReader) {
+                metadataReader.cancel();
+                metadataReader = null;
+            }
+            currentPlayingUrl = null;
+            updateButtons();
+            document.getElementById('nowPlaying').textContent = "🎵 Nu este în curs de redare";
         }
 
-        function updateButtons(activeUrl) {
-            document.querySelectorAll('.radio-card button').forEach(button => {
-                const url = button.dataset.url;
+        async function playRadio(url) {
+            if (currentPlayingUrl === url) {
+                stopCurrentStream();
+                return;
+            }
+
+            stopCurrentStream();
+            currentPlayingUrl = url;
+
+            try {
+                // Folosim proxy CORS pentru a evita erorile
+                const proxyUrl = CORS_PROXY + url;
                 
-                if (url === activeUrl) {
-                    button.classList.replace('play-btn', 'stop-btn');
+                // Configurăm redarea audio
+                currentSound = new Howl({
+                    src: [proxyUrl],
+                    html5: true,
+                    format: ['mp3', 'aac'],
+                    onend: () => stopCurrentStream(),
+                    onplayerror: () => handlePlayError(url)
+                });
+
+                currentSound.play();
+                updateButtons();
+                getStreamMetadata(url);
+            } catch (error) {
+                console.error('Eroare:', error);
+                stopCurrentStream();
+            }
+        }
+
+        async function getStreamMetadata(url) {
+            try {
+                const response = await fetch(CORS_PROXY + url, {
+                    headers: {
+                        'Icy-MetaData': '1',
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+                    }
+                });
+                
+                const metaint = parseInt(response.headers.get('icy-metaint'));
+                if (!metaint) return;
+
+                metadataReader = response.body.getReader();
+                let buffer = new Uint8Array();
+                
+                const processData = async ({ done, value }) => {
+                    if (done) return;
+                    
+                    buffer = concatTypedArrays(buffer, value);
+                    
+                    while (buffer.length >= metaint) {
+                        // Sărim peste datele audio
+                        buffer = buffer.slice(metaint);
+                        
+                        // Citim metadatele
+                        const metadataLength = buffer[0] * 256;
+                        buffer = buffer.slice(1);
+                        
+                        if (metadataLength > 0 && buffer.length >= metadataLength) {
+                            const metadata = new TextDecoder().decode(buffer.slice(0, metadataLength));
+                            const titleMatch = metadata.match(/StreamTitle='(.*?)';/);
+                            if (titleMatch) {
+                                document.getElementById('nowPlaying').textContent = 
+                                    `🎵 În curs de redare: ${titleMatch[1]}`;
+                            }
+                            buffer = buffer.slice(metadataLength);
+                        }
+                    }
+                    
+                    metadataReader.read().then(processData);
+                };
+                
+                metadataReader.read().then(processData);
+            } catch (error) {
+                console.log('Nu pot prelua metadate:', error);
+            }
+        }
+
+        function handlePlayError(url) {
+            // Încercăm redarea directă ca fallback
+            new Audio(url).play().catch(() => {
+                stopCurrentStream();
+                alert('Nu pot reda acest stream!');
+            });
+        }
+
+        function concatTypedArrays(a, b) {
+            const c = new Uint8Array(a.length + b.length);
+            c.set(a, 0);
+            c.set(b, a.length);
+            return c;
+        }
+
+        function updateButtons() {
+            document.querySelectorAll('.radio-card button').forEach(button => {
+                const buttonUrl = button.dataset.url;
+                if (buttonUrl === currentPlayingUrl) {
+                    button.classList.add('stop-btn');
+                    button.classList.remove('play-btn');
                     button.textContent = '⏹ Stop';
                 } else {
-                    button.classList.replace('stop-btn', 'play-btn');
+                    button.classList.add('play-btn');
+                    button.classList.remove('stop-btn');
                     button.textContent = '▶ Play';
                 }
             });
         }
 
-        function playRadio(url) {
-            stopCurrentStream();
-            currentRadio = url;
-
-            lunaPlayer = new LunaRadio({
-                src: url,
-                autoplay: true,
-                volume: parseFloat(volumeControl.value)
-            });
-
-            updateButtons(url);
-        }
-
-        function renderRadioStations(stations) {
-            stations.forEach((station, index) => {
-                const radioCard = createRadioCard(station, index + 1);
-                radioList.appendChild(radioCard);
-            });
-        }
-
-        function createRadioCard(station, index) {
-            const div = document.createElement('div');
-            div.className = 'radio-card';
-
-            div.innerHTML = `
-                <div class="radio-info">
-                    <span class="radio-title">${index}. ${station.name}</span>
-                    <button class="play-btn" data-url="${station.url}">▶ Play</button>
-                </div>
-            `;
-
-            return div;
-        }
-
         function parseM3U(file) {
             const reader = new FileReader();
-
             reader.onload = function(e) {
-                const content = e.target.result.split('\n');
-                const radioStations = [];
-
-                for (let i = 0; i < content.length; i++) {
-                    const line = content[i].trim();
+                const lines = e.target.result.split('\n');
+                const stations = [];
+                
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
                     if (line.startsWith('#EXTINF')) {
-                        const stationName = line.split(',')[1] || 'Unknown Station';
-                        const url = content[i + 1]?.trim();
-                        if (url) {
-                            radioStations.push({ name: stationName, url });
-                        }
-                        i++;
+                        const name = line.split(',')[1] || `Post ${stations.length + 1}`;
+                        const url = lines[++i]?.trim();
+                        if (url) stations.push({ name, url });
                     } else if (line.startsWith('http')) {
-                        radioStations.push({ name: line.split('/').pop(), url: line });
+                        stations.push({
+                            name: `Post ${stations.length + 1}`,
+                            url: line
+                        });
                     }
                 }
-
-                renderRadioStations(radioStations);
+                
+                renderRadioStations(stations);
             };
-
             reader.readAsText(file);
         }
 
-        function handlePlayPause(e) {
-            const target = e.target;
-
-            if (target.classList.contains('play-btn')) {
-                playRadio(target.dataset.url);
-            } else if (target.classList.contains('stop-btn')) {
-                stopCurrentStream();
-                updateButtons(null);
-            }
+        function renderRadioStations(stations) {
+            const radioList = document.getElementById('radioList');
+            radioList.innerHTML = '';
+            
+            stations.forEach((station, index) => {
+                const card = document.createElement('div');
+                card.className = 'radio-card';
+                card.innerHTML = `
+                    <div class="radio-info">
+                        <span class="radio-title">${index + 1}. ${station.name}</span>
+                        <button class="play-btn" data-url="${station.url}">▶ Play</button>
+                    </div>
+                `;
+                radioList.appendChild(card);
+            });
         }
 
-        document.getElementById('fileInput').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) parseM3U(file);
+        // Gestionare evenimente
+        document.getElementById('radioList').addEventListener('click', (e) => {
+            const button = e.target.closest('button');
+            if (!button || !button.dataset.url) return;
+
+            const url = button.dataset.url;
+            url === currentPlayingUrl ? stopCurrentStream() : playRadio(url);
         });
 
-        radioList.addEventListener('click', handlePlayPause);
-
-        volumeControl.addEventListener('input', function() {
-            if (lunaPlayer) lunaPlayer.setVolume(parseFloat(this.value));
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) parseM3U(file);
         });
     </script>
 </body>
