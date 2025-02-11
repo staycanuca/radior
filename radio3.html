@@ -114,142 +114,116 @@
     </div>
 
     <script>
-        let currentRadio = null; // URL-ul curent al postului redat
+        let currentRadio = null;
         const radioList = document.getElementById('radioList');
         const volumeControl = document.getElementById('volumeControl');
 
-        let lunaPlayer = null; // Instanța Luna Radio Player
+        let lunaPlayer = null;
 
-       // Funcție pentru a opri doar fluxul curent
-       function stopCurrentStream() {
-           if (lunaPlayer) { 
-               lunaPlayer.stop(); 
-               lunaPlayer = null; 
-           }
-           currentRadio = null; // Resetează fluxul curent
-       }
+        function stopCurrentStream() {
+            if (lunaPlayer) {
+                lunaPlayer.stop();
+            }
+            currentRadio = null;
+            updateButtons(null);
+        }
 
-       // Funcție pentru a actualiza starea butoanelor Play/Stop
-       function updateButtons(activeUrl) {
-           const buttons = document.querySelectorAll('.radio-card .play-btn, .radio-card .stop-btn');
-           buttons.forEach(button => {
-               const url = button.dataset.url;
+        function updateButtons(activeUrl) {
+            document.querySelectorAll('.radio-card button').forEach(button => {
+                const url = button.dataset.url;
+                
+                if (url === activeUrl) {
+                    button.classList.replace('play-btn', 'stop-btn');
+                    button.textContent = '⏹ Stop';
+                } else {
+                    button.classList.replace('stop-btn', 'play-btn');
+                    button.textContent = '▶ Play';
+                }
+            });
+        }
 
-               if (url === activeUrl) {
-                   // Dacă este fluxul activ, afișează butonul Stop
-                   const stopBtn = document.createElement('button');
-                   stopBtn.className = 'stop-btn';
-                   stopBtn.textContent = '⏹ Stop';
-                   stopBtn.dataset.url = url;
+        function playRadio(url) {
+            stopCurrentStream();
+            currentRadio = url;
 
-                   button.replaceWith(stopBtn);
-               } else if (button.classList.contains('stop-btn')) {
-                   // Dacă nu este fluxul activ și este Stop, schimbă în Play
-                   const playBtn = document.createElement('button');
-                   playBtn.className = 'play-btn';
-                   playBtn.textContent = '▶ Play';
-                   playBtn.dataset.url = url;
+            lunaPlayer = new LunaRadio({
+                src: url,
+                autoplay: true,
+                volume: parseFloat(volumeControl.value)
+            });
 
-                   button.replaceWith(playBtn);
-               }
-           });
-       }
+            updateButtons(url);
+        }
 
-       // Funcție pentru a reda un post de radio
-       function playRadio(url) {
-           stopCurrentStream(); // Oprește orice flux activ
+        function renderRadioStations(stations) {
+            stations.forEach((station, index) => {
+                const radioCard = createRadioCard(station, index + 1);
+                radioList.appendChild(radioCard);
+            });
+        }
 
-           currentRadio = url;
+        function createRadioCard(station, index) {
+            const div = document.createElement('div');
+            div.className = 'radio-card';
 
-           lunaPlayer = new LunaRadio({
-               src: url,
-               autoplay: true,
-               volume: parseFloat(volumeControl.value)
-           });
+            div.innerHTML = `
+                <div class="radio-info">
+                    <span class="radio-title">${index}. ${station.name}</span>
+                    <button class="play-btn" data-url="${station.url}">▶ Play</button>
+                </div>
+            `;
 
-           updateButtons(url); // Actualizează starea butoanelor
-       }
+            return div;
+        }
 
-       // Funcție pentru a afișa lista de posturi fără a o reseta
-       function renderRadioStations(stations) {
-           radioList.innerHTML = '';
-           
-           stations.forEach((station, index) => {
-               const radioCard = createRadioCard(station, index + 1);
-               radioList.appendChild(radioCard);
-           });
-       }
+        function parseM3U(file) {
+            const reader = new FileReader();
 
-       // Creează un card pentru fiecare stație de radio
-       function createRadioCard(station, index) {
-           const div = document.createElement('div');
-           
-           div.className = 'radio-card';
-           
-           div.innerHTML = `
-               <div class="radio-info">
-                   <span class="radio-title">${index}. ${station.name}</span>
-                   <button class="play-btn" data-url="${station.url}">▶ Play</button>
-               </div>
-           `;
-           
-           return div;
-       }
+            reader.onload = function(e) {
+                const content = e.target.result.split('\n');
+                const radioStations = [];
 
-       // Funcție pentru a parsa fișierul M3U fără a afecta lista existentă
-       function parseM3U(file) {
-           const reader = new FileReader();
-           
-           reader.onload = function(e) {
-               const content = e.target.result; // Conținutul fișierului
-               const lines = content.split('\n');
-               const radioStations = [];
+                for (let i = 0; i < content.length; i++) {
+                    const line = content[i].trim();
+                    if (line.startsWith('#EXTINF')) {
+                        const stationName = line.split(',')[1] || 'Unknown Station';
+                        const url = content[i + 1]?.trim();
+                        if (url) {
+                            radioStations.push({ name: stationName, url });
+                        }
+                        i++;
+                    } else if (line.startsWith('http')) {
+                        radioStations.push({ name: line.split('/').pop(), url: line });
+                    }
+                }
 
-               for (let i = 0; i < lines.length; i++) {
-                   const line = lines[i].trim();
-                   if (line.startsWith('#EXTINF')) { 
-                       const stationName = line.split(',')[1] || 'Unknown Station';
-                       const url = lines[i + 1]?.trim();
-                       if (url) {
-                           radioStations.push({ name: stationName, url });
-                       }
-                       i++; // Sari peste linia URL
-                   } else if (line.startsWith('http')) { 
-                       radioStations.push({ name: line.split('/').pop(), url: line });
-                   }
-               }
+                renderRadioStations(radioStations);
+            };
 
-               renderRadioStations(radioStations);
-           };
+            reader.readAsText(file);
+        }
 
-           reader.readAsText(file);
-       }
+        function handlePlayPause(e) {
+            const target = e.target;
 
-       // Gestionarea evenimentelor de clic pe butoane
-       function handlePlayPause(e) {
-           const target = e.target;
+            if (target.classList.contains('play-btn')) {
+                playRadio(target.dataset.url);
+            } else if (target.classList.contains('stop-btn')) {
+                stopCurrentStream();
+                updateButtons(null);
+            }
+        }
 
-           if (target.classList.contains('play-btn')) {
-               playRadio(target.dataset.url);
-           } else if (target.classList.contains('stop-btn')) {
-               stopCurrentStream();
-               updateButtons(null); // Resetează starea butoanelor la Play
-           }
-       }
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) parseM3U(file);
+        });
 
-       // Eveniment pentru încărcarea fișierului M3U
-       document.getElementById('fileInput').addEventListener('change', function(e) {
-           const file = e.target.files[0];
-           if (file) parseM3U(file);
-       });
+        radioList.addEventListener('click', handlePlayPause);
 
-       // Eveniment pentru gestionarea clicurilor în lista de posturi
-       radioList.addEventListener('click', handlePlayPause);
-
-       // Eveniment pentru slider-ul de volum
-       volumeControl.addEventListener('input', function() {
-           if (lunaPlayer) lunaPlayer.setVolume(parseFloat(this.value));
-       });
-   </script>
+        volumeControl.addEventListener('input', function() {
+            if (lunaPlayer) lunaPlayer.setVolume(parseFloat(this.value));
+        });
+    </script>
 </body>
 </html>
